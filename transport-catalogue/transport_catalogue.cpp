@@ -5,18 +5,20 @@ using namespace std;
 
 namespace tc::catalogue {
 
-void TransportCatalogue::AddStop(string name, geo::Coordinates coordinates) {
-    auto &new_stop = stops_.emplace_back();
-    new_stop.name = std::move(name);
-    new_stop.coordinates = coordinates;
+void TransportCatalogue::AddStop(const string& name, geo::Coordinates coordinates) {
+    Stop stop;
+    stop.name = name;
+    stop.coordinates = coordinates;
+    auto& new_stop = stops_.emplace_back(std::move(stop));
     stops_map_[new_stop.name] = &new_stop;
 }
 
-void TransportCatalogue::AddBus(string name, const vector<string_view> &stops) {
-    auto &new_bus = buses_.emplace_back();
-    new_bus.name = std::move(name);
-
+void TransportCatalogue::AddBus(const string& name, const vector<string_view> &stops) {
+    Bus bus;
+    bus.name = name;
+    auto &new_bus = buses_.emplace_back(std::move(bus));
     buses_map_[new_bus.name] = &new_bus;
+
     new_bus.stops.reserve(stops.size());
     for (size_t i = 0; i < stops.size(); ++i) {
         const auto &stop_name = stops[i];
@@ -32,14 +34,14 @@ void TransportCatalogue::AddBus(string name, const vector<string_view> &stops) {
 }
 
 const TransportCatalogue::Bus *TransportCatalogue::GetBus(string_view id) const {
-    if (!buses_map_.count(id)) {
+    if (buses_map_.count(id) == 0) {
         return nullptr;
     }
     return buses_map_.at(id);
 }
 
 const TransportCatalogue::Stop *TransportCatalogue::GetStop(string_view id) const {
-    if (!stops_map_.count(id)) {
+    if (stops_map_.count(id) == 0) {
         return nullptr;
     }
     return stops_map_.at(id);

@@ -13,7 +13,6 @@ namespace tc::catalogue {
 
 class TransportCatalogue {
 public:
-    struct Stop;
     struct Bus;
 
     struct Stop {
@@ -44,9 +43,9 @@ public:
 
     ~TransportCatalogue() = default;
 
-    void AddStop(std::string id, geo::Coordinates coordinates);
+    void AddStop(const std::string& name, geo::Coordinates coordinates);
 
-    void AddBus(std::string id, const std::vector<std::string_view> &stops);
+    void AddBus(const std::string& name, const std::vector<std::string_view> &stops);
 
     const Bus *GetBus(std::string_view id) const;
 
