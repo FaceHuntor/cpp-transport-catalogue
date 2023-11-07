@@ -15,7 +15,8 @@ void PrintBusStat(const TransportCatalogue &transport_catalogue, ostream &output
         output << "not found";
     } else {
         output << bus->stops.size() << " stops on route, " << bus->unique_stops.size() << " unique stops, "
-               << setprecision(6) << bus->route_len << " route length";
+               << setprecision(0) << fixed << bus->route_len_actual << " route length, "
+               << setprecision(5) << fixed << bus->route_len_actual / bus->route_len_geo << " curvature";
     }
     output << endl;
 }

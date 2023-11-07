@@ -27,15 +27,15 @@ public:
         std::string name;
         geo::Coordinates coordinates;
         std::set<const Bus *, BusComparator> buses;
-
-        Stop() = default;
+        std::unordered_map<const Stop*, double> stops_distances;
     };
 
     struct Bus {
         std::string name;
         std::vector<const Stop *> stops;
         std::unordered_set<std::string_view> unique_stops;
-        double route_len = 0;
+        double route_len_geo = 0;
+        double route_len_actual = 0;
     };
 
 public:
@@ -46,6 +46,8 @@ public:
     void AddStop(const std::string& name, geo::Coordinates coordinates);
 
     void AddBus(const std::string& name, const std::vector<std::string_view> &stops);
+
+    void SetDistances(std::string_view id, std::vector<std::pair<std::string_view, int>> distances);
 
     const Bus *GetBus(std::string_view id) const;
 

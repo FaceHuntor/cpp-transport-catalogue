@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <iterator>
-#include <iostream>
+#include <regex>
 
 
 namespace tc::io {
@@ -11,25 +11,45 @@ namespace tc::io {
 using namespace catalogue;
 using namespace geo;
 
-/**
- * Парсит строку вида "10.123,  -30.1837" и возвращает пару координат (широта, долгота)
- */
-Coordinates ParseCoordinates(std::string_view str) {
+
+void ParseStopCommands(std::string_view str, Coordinates& coordinates, std::vector<std::pair<std::string_view, int>>& dist) {
     static const double nan = std::nan("");
 
     auto not_space = str.find_first_not_of(' ');
     auto comma = str.find(',');
 
     if (comma == str.npos) {
-        return {nan, nan};
+        coordinates = {nan, nan};
+        return;
     }
 
     auto not_space2 = str.find_first_not_of(' ', comma + 1);
+    auto comma2 = str.find(',', not_space2 + 1);
 
     double lat = std::stod(std::string(str.substr(not_space, comma - not_space)));
-    double lng = std::stod(std::string(str.substr(not_space2)));
+    double lng = std::stod(std::string(str.substr(not_space2, comma2 - not_space2)));
 
-    return {lat, lng};
+    coordinates = {lat, lng};
+
+    auto start_dist = comma2;
+    std::match_results<std::string_view::const_iterator> m;
+    const static std::regex reg(R"(,\s*(\d+\.?\d*)m\s+to\s+((?:\w[\w\s]*\w)|(?:\w))s*,?)");
+    while (true) {
+        if(start_dist >= str.length()) {
+            break;
+        }
+        std::string_view cur_substr = str.substr(start_dist);
+        if(!std::regex_search(cur_substr.begin(), cur_substr.end(), m, reg))
+        {
+            break;
+        }
+        dist.emplace_back(std::string_view(m[2].first, m[2].second - m[2].first),
+                          std::stod(std::string(m[1].first, m[1].second)));
+        start_dist += m[0].second - m[0].first;
+        if(m[0].second != str.end()){
+            --start_dist;
+        }
+    }
 }
 
 /**
@@ -110,10 +130,20 @@ void InputReader::ParseLine(std::string_view line) {
 }
 
 void InputReader::ApplyCommands([[maybe_unused]] TransportCatalogue &catalogue) const {
+    std::unordered_map<std::string_view, std::vector<std::pair<std::string_view, int>>> distances;
+
     for (const auto &command: commands_) {
         if (command.command == "Stop") {
-            catalogue.AddStop(command.id, ParseCoordinates(command.description));
+            Coordinates coords;
+            std::vector<std::pair<std::string_view, int>> dist;
+            ParseStopCommands(command.description, coords, dist);
+            catalogue.AddStop(command.id, coords);
+            distances[command.id] = std::move(dist);
         }
+    }
+
+    for(const auto& [id, dist]: distances) {
+        catalogue.SetDistances(id, dist);
     }
 
     for (const auto &command: commands_) {

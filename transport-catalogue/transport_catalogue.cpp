@@ -28,8 +28,34 @@ void TransportCatalogue::AddBus(const string& name, const vector<string_view> &s
         new_bus.stops.emplace_back(stop);
         new_bus.unique_stops.emplace(stop->name);
         if (i > 0) {
-            new_bus.route_len += ComputeDistance(new_bus.stops[i - 1]->coordinates, new_bus.stops[i]->coordinates);
+            auto* first_stop = new_bus.stops[i - 1];
+            assert(first_stop);
+            auto* second_stop = new_bus.stops[i];
+            assert(second_stop);
+            auto dist_geo = ComputeDistance(first_stop->coordinates, second_stop->coordinates);
+            new_bus.route_len_geo += dist_geo;
+
+            if(first_stop->stops_distances.count(second_stop)) {
+                new_bus.route_len_actual += first_stop->stops_distances.at(second_stop);
+            } else if(second_stop->stops_distances.count(first_stop)) {
+                new_bus.route_len_actual += second_stop->stops_distances.at(first_stop);
+            } else {
+                new_bus.route_len_actual += dist_geo;
+            }
         }
+    }
+}
+
+void TransportCatalogue::SetDistances(std::string_view id, std::vector<std::pair<std::string_view, int>> distances) {
+    if (stops_map_.count(id) == 0) {
+        return;
+    }
+    auto* stop = stops_map_.at(id);
+    assert(stop);
+    for(const auto& [other_id, dist]: distances) {
+        auto* other_stop = GetStop(other_id);
+        assert(other_stop);
+        stop->stops_distances.emplace(other_stop, dist);
     }
 }
 
