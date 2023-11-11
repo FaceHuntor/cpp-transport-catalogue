@@ -130,7 +130,7 @@ void InputReader::ParseLine(std::string_view line) {
 }
 
 void InputReader::ApplyCommands([[maybe_unused]] TransportCatalogue &catalogue) const {
-    std::unordered_map<std::string_view, std::vector<std::pair<std::string_view, int>>> distances;
+    std::unordered_map<std::string_view, std::vector<std::pair<std::string_view, int>>> distancesMap;
 
     for (const auto &command: commands_) {
         if (command.command == "Stop") {
@@ -138,12 +138,14 @@ void InputReader::ApplyCommands([[maybe_unused]] TransportCatalogue &catalogue) 
             std::vector<std::pair<std::string_view, int>> dist;
             ParseStopCommands(command.description, coords, dist);
             catalogue.AddStop(command.id, coords);
-            distances[command.id] = std::move(dist);
+            distancesMap[command.id] = std::move(dist);
         }
     }
 
-    for(const auto& [id, dist]: distances) {
-        catalogue.SetDistances(id, dist);
+    for(const auto& [firstStopName, distances]: distancesMap) {
+        for(const auto& [secondStopName, dist]: distances) {
+            catalogue.SetDistance(firstStopName, secondStopName, dist);
+        }
     }
 
     for (const auto &command: commands_) {

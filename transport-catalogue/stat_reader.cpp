@@ -8,30 +8,30 @@ namespace tc::io {
 
 using namespace catalogue;
 
-void PrintBusStat(const TransportCatalogue &transport_catalogue, ostream &output, string_view id) {
-    const auto *bus = transport_catalogue.GetBus(id);
-    output << "Bus " << id << ": ";
-    if (!bus) {
+void PrintBusStat(const TransportCatalogue &transport_catalogue, ostream &output, string_view bus_name) {
+    auto bus_info = transport_catalogue.GetBusInfo(bus_name);
+    output << "Bus " << bus_name << ": ";
+    if (!bus_info) {
         output << "not found";
     } else {
-        output << bus->stops.size() << " stops on route, " << bus->unique_stops.size() << " unique stops, "
-               << setprecision(0) << fixed << bus->route_len_actual << " route length, "
-               << setprecision(5) << fixed << bus->route_len_actual / bus->route_len_geo << " curvature";
+        output << bus_info->stops_count << " stops on route, " << bus_info->unique_stops_count << " unique stops, "
+               << setprecision(0) << fixed << bus_info->route_length << " route length, "
+               << setprecision(5) << fixed << bus_info->curvature << " curvature";
     }
     output << endl;
 }
 
-void PrintStopStat(const TransportCatalogue &transport_catalogue, ostream &output, string_view id) {
-    const auto *stop = transport_catalogue.GetStop(id);
-    output << "Stop " << id << ": ";
-    if (!stop) {
+void PrintStopStat(const TransportCatalogue &transport_catalogue, ostream &output, string_view stop_name) {
+    const auto stop_info = transport_catalogue.GetStopInfo(stop_name);
+    output << "Stop " << stop_name << ": ";
+    if (!stop_info) {
         output << "not found";
-    } else if (stop->buses.empty()) {
+    } else if (stop_info->buses.empty()) {
         output << "no buses";
     } else {
         output << "buses";
-        for (const auto &bus: stop->buses) {
-            output << " " << bus->name;
+        for (const auto &bus: stop_info->buses) {
+            output << " " << bus;
         }
     }
     output << endl;
