@@ -232,73 +232,41 @@ Node LoadNode(istream& input) {
     }
 }
 
-Node::Node(Array array)
-        : data_(std::move(array)) {
-}
-
-Node::Node(Dict map)
-        : data_(std::move(map)) {
-}
-
-Node::Node(int value)
-        : data_(value) {
-}
-
-Node::Node(string value) {
-    data_ = std::move(value);
-}
-
-Node::Node(const char* value) {
-    data_ = std::string(value);
-}
-
-Node::Node(nullptr_t value)
-        : data_(value) {
-}
-
-Node::Node(double value)
-        : data_(value) {
-}
-
-Node::Node(bool value)
-        : data_(value) {
-}
-
 bool Node::IsInt() const {
-    return holds_alternative<int>(data_);
+    return holds_alternative<int>(*this);
 }
 
 bool Node::IsDouble() const {
-    return holds_alternative<int>(data_) || holds_alternative<double>(data_);
+    return holds_alternative<int>(*this) || holds_alternative<double>(*this);
 }
 
 bool Node::IsPureDouble() const {
-    return holds_alternative<double>(data_);
+    return holds_alternative<double>(*this);
 }
 
 bool Node::IsBool() const {
-    return holds_alternative<bool>(data_);
+    return holds_alternative<bool>(*this);
 }
 
 bool Node::IsString() const {
-    return holds_alternative<string>(data_);
+    return holds_alternative<string>(*this);
 }
 
 bool Node::IsNull() const {
-    return holds_alternative<std::nullptr_t>(data_);
+    return holds_alternative<std::nullptr_t>(*this);
 }
 
 bool Node::IsArray() const {
-    return holds_alternative<Array>(data_);
+    return holds_alternative<Array>(*this);
 }
 
 bool Node::IsMap() const {
-    return holds_alternative<Dict>(data_);
+    return holds_alternative<Dict>(*this);
 }
 
 const Array& Node::AsArray() const {
     try {
-        return std::get<Array>(data_);
+        return std::get<Array>(*this);
     }
     catch (const std::bad_variant_access& ex) {
         throw std::logic_error("Node is not array");
@@ -307,7 +275,7 @@ const Array& Node::AsArray() const {
 
 const Dict& Node::AsMap() const {
     try {
-        return std::get<Dict>(data_);
+        return std::get<Dict>(*this);
     }
     catch (const std::bad_variant_access& ex) {
         throw std::logic_error("Node is not dict");
@@ -316,7 +284,7 @@ const Dict& Node::AsMap() const {
 
 int Node::AsInt() const {
     try {
-        return std::get<int>(data_);
+        return std::get<int>(*this);
     }
     catch (const std::bad_variant_access& ex) {
         throw std::logic_error("Node is not int");
@@ -324,17 +292,17 @@ int Node::AsInt() const {
 }
 
 double Node::AsDouble() const {
-    if (holds_alternative<int>(data_)) {
-        return std::get<int>(data_);
-    } else if (holds_alternative<double>(data_)) {
-        return std::get<double>(data_);
+    if (holds_alternative<int>(*this)) {
+        return std::get<int>(*this);
+    } else if (holds_alternative<double>(*this)) {
+        return std::get<double>(*this);
     }
     throw std::logic_error("Node is not double");
 }
 
 const string& Node::AsString() const {
     try {
-        return std::get<string>(data_);
+        return std::get<string>(*this);
     }
     catch (const std::bad_variant_access& ex) {
         throw std::logic_error("Node is not string");
@@ -343,7 +311,7 @@ const string& Node::AsString() const {
 
 bool Node::AsBool() const {
     try {
-        return std::get<bool>(data_);
+        return std::get<bool>(*this);
     }
     catch (const std::bad_variant_access& ex) {
         throw std::logic_error("Node is not bool");

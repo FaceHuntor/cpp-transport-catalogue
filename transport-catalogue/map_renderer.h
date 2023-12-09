@@ -30,43 +30,6 @@ struct RenderSettings {
     std::vector<svg::Color> color_palette;
 };
 
-class MapRenderer {
-public:
-    explicit MapRenderer(RenderSettings settings = {});
-
-    template <typename BusInputIt, typename StopInputIt>
-    svg::Document RenderMap(BusInputIt buses_begin, BusInputIt buses_end, StopInputIt stops_begin, StopInputIt stops_end) const;
-    void SetSettings(RenderSettings settings);
-    [[maybe_unused]] const RenderSettings& GetSettings() const;
-
-private:
-    void PutText(svg::Document& document, const std::string& text, const svg::Point& pos, const svg::Color& color) const {
-        auto base_text = std::make_unique<svg::Text>();
-
-        base_text->SetData(text);
-        base_text->SetPosition(pos);
-        base_text->SetOffset(settings_.bus_label_offset);
-        base_text->SetFontSize(settings_.bus_label_font_size);
-        base_text->SetFontFamily("Verdana");
-        base_text->SetFontWeight("bold");
-
-        auto substrate = std::make_unique<svg::Text>(*base_text);
-
-        substrate->SetFillColor(settings_.underlayer_color);
-        substrate->SetStrokeColor(settings_.underlayer_color);
-        substrate->SetStrokeWidth(settings_.underlayer_width);
-        substrate->SetStrokeLineCap(svg::StrokeLineCap::ROUND);
-        substrate->SetStrokeLineJoin(svg::StrokeLineJoin::ROUND);
-
-        base_text->SetFillColor(color);
-        document.AddPtr(std::move(substrate));
-        document.AddPtr(std::move(base_text));
-    }
-
-private:
-    RenderSettings settings_;
-};
-
 class SphereProjector {
 public:
     // points_begin и points_end задают начало и конец интервала элементов geo::Coordinates
@@ -141,6 +104,25 @@ private:
     double zoom_coeff_ = 0;
 };
 
+class MapRenderer {
+public:
+    explicit MapRenderer(RenderSettings settings = {});
+
+    template <typename BusInputIt, typename StopInputIt>
+    svg::Document RenderMap(BusInputIt buses_begin, BusInputIt buses_end, StopInputIt stops_begin, StopInputIt stops_end) const;
+    void SetSettings(RenderSettings settings);
+    [[maybe_unused]] const RenderSettings& GetSettings() const;
+
+private:
+    void RenderBusRoute(svg::Document& document, const SphereProjector& projector, const domain::Bus& bus, const svg::Color& color) const;
+    void RenderBusText(svg::Document& document, const std::string& text, const svg::Point& pos, const svg::Color& color) const;
+    void RenderStopSymbol(svg::Document& document, const svg::Point& pos) const;
+    void RenderStopText(svg::Document& document, const std::string& text, const svg::Point& pos) const;
+
+private:
+    RenderSettings settings_;
+};
+
 template <typename BusInputIt, typename StopInputIt>
 svg::Document MapRenderer::RenderMap(BusInputIt buses_begin, BusInputIt buses_end, StopInputIt stops_begin, StopInputIt stops_end) const {
     std::vector<geo::Coordinates> stop_coords;
@@ -174,20 +156,9 @@ svg::Document MapRenderer::RenderMap(BusInputIt buses_begin, BusInputIt buses_en
         if(bus->stops.empty()) {
             continue;
         }
-
-        auto line = std::make_unique<svg::Polyline>();
-
-        for(const auto stop: bus->stops){
-            auto coords = projector(stop->coordinates);
-            line->AddPoint(coords);
-        }
         assert(cur_palette_color.base());
-        line->SetStrokeColor(*cur_palette_color);
-        line->SetFillColor(svg::Color());
-        line->SetStrokeWidth(settings_.line_width);
-        line->SetStrokeLineCap(svg::StrokeLineCap::ROUND);
-        line->SetStrokeLineJoin(svg::StrokeLineJoin::ROUND);
-        document.AddPtr(std::move(line));
+
+        RenderBusRoute(document, projector, *bus, *cur_palette_color);
 
         ++cur_palette_color;
         cur_palette_color = cur_palette_color == settings_.color_palette.end() ? settings_.color_palette.begin() : cur_palette_color;
@@ -201,16 +172,15 @@ svg::Document MapRenderer::RenderMap(BusInputIt buses_begin, BusInputIt buses_en
         {
             auto& stop = bus->stops.front();
             auto pos = projector(stop->coordinates);
-            PutText(document, bus->name, pos, *cur_palette_color);
+            RenderBusText(document, bus->name, pos, *cur_palette_color);
         }
         if(!bus->is_roundtrip) {
             auto& last_stop = bus->stops[bus->stops.size() / 2];
             if(last_stop->name != bus->stops.front()->name) {
                 auto pos = projector(last_stop->coordinates);
-                PutText(document, bus->name, pos, *cur_palette_color);
+                RenderBusText(document, bus->name, pos, *cur_palette_color);
             }
         }
-
         ++cur_palette_color;
         cur_palette_color = cur_palette_color == settings_.color_palette.end() ? settings_.color_palette.begin() : cur_palette_color;
     }
@@ -220,11 +190,7 @@ svg::Document MapRenderer::RenderMap(BusInputIt buses_begin, BusInputIt buses_en
             continue;
         }
         auto coords = projector(stop->coordinates);
-        auto stop_circle = std::make_unique<svg::Circle>();
-        stop_circle->SetRadius(settings_.stop_radius);
-        stop_circle->SetCenter(coords);
-        stop_circle->SetFillColor(std::string("white"));
-        document.AddPtr(std::move(stop_circle));
+        RenderStopSymbol(document, coords);
     }
 
     for(const auto& stop: stops){
@@ -232,27 +198,8 @@ svg::Document MapRenderer::RenderMap(BusInputIt buses_begin, BusInputIt buses_en
             continue;
         }
         auto coords = projector(stop->coordinates);
-        auto stop_text = std::make_unique<svg::Text>();
-        stop_text->SetPosition(coords);
-        stop_text->SetOffset(settings_.stop_label_offset);
-        stop_text->SetFontSize(settings_.stop_label_font_size);
-        stop_text->SetFontFamily("Verdana");
-        stop_text->SetData(stop->name);
-
-        auto stop_substrate = std::make_unique<svg::Text>(*stop_text);
-        stop_substrate->SetFillColor(settings_.underlayer_color);
-        stop_substrate->SetStrokeColor(settings_.underlayer_color);
-        stop_substrate->SetStrokeWidth(settings_.underlayer_width);
-        stop_substrate->SetStrokeLineCap(svg::StrokeLineCap::ROUND);
-        stop_substrate->SetStrokeLineJoin(svg::StrokeLineJoin::ROUND);
-
-        stop_text->SetFillColor(svg::Color(std::string("black")));
-
-        document.AddPtr(std::move(stop_substrate));
-        document.AddPtr(std::move(stop_text));
+        RenderStopText(document, stop->name, coords);
     }
-
-//    document.Add(svg::Polyline())
     return document;
 }
 

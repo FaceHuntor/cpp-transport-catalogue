@@ -19,32 +19,9 @@ public:
     using runtime_error::runtime_error;
 };
 
-class Node {
+class Node : public std::variant<std::nullptr_t, int, double, bool, std::string, Array, Dict> {
 public:
-    using Value = std::variant<std::nullptr_t, int, double, bool, std::string,  Array, Dict>;
-
-    Node() = default;
-    Node(std::nullptr_t null);
-    Node(int value);
-    Node(double value);
-    Node(bool value);
-    Node(Dict map);
-    Node(std::string value);
-    Node(const char* value);
-    Node(Array array);
-
-    Node(const Node& other) = default;
-    Node(Node&& other) = default;
-    ~Node() = default;
-
-    Node& operator=(const Node& other) = default;
-    Node& operator=(Node&& other) = default;
-    bool operator==(const Node& other) const {
-        return data_ == other.data_;
-    }
-    bool operator!=(const Node& other) const {
-        return !(*this == other);
-    }
+    using variant::variant;
 
     bool IsInt() const;
     bool IsDouble() const;
@@ -62,10 +39,7 @@ public:
     const Array& AsArray() const;
     const Dict& AsMap() const;
 
-    const Value& GetValue() const {return data_;};
-
-private:
-     Value data_;
+    const variant& GetValue() const {return *this;};
 };
 
 class Document {
