@@ -22,6 +22,7 @@ public:
 class Node : public std::variant<std::nullptr_t, int, double, bool, std::string, Array, Dict> {
 public:
     using variant::variant;
+    using Value = variant;
 
     bool IsInt() const;
     bool IsDouble() const;
@@ -39,7 +40,10 @@ public:
     const Array& AsArray() const;
     const Dict& AsMap() const;
 
-    const variant& GetValue() const {return *this;};
+    const Value& GetValue() const {return *this;};
+    Value& GetValue() {
+        return *this;
+    }
 };
 
 class Document {

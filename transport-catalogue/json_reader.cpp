@@ -1,4 +1,5 @@
 #include "json_reader.h"
+#include "json_builder.h"
 
 #include <algorithm>
 #include <cassert>
@@ -143,49 +144,52 @@ void JsonReader::SettingRenderer(renderer::MapRenderer& rend, const json::Dict& 
 }
 
 void JsonReader::FormOutput(const RequestHandler& handler, const json::Array& requests, std::ostream& output) {
-    json::Array out_data;
+    json::Builder out_builder;
+    out_builder.StartArray();
 
     for(const auto& request_node: requests) {
         auto& request = request_node.AsMap();
         const auto& type = request.at("type").AsString();
-
-        json::Dict response_unit;
-        response_unit["request_id"] = request.at("id").AsInt();
+        json::Builder response_unit;
+        response_unit.StartDict();
+        response_unit.Key("request_id").Value(request.at("id").AsInt());
 
         if (type == "Bus") {
             const auto& name = request.at("name").AsString();
             const auto bus_info = handler.GetBusInfo(name);
             if (!bus_info) {
-                response_unit["error_message"] = "not found"s;
+                response_unit.Key("error_message").Value("not found"s);
             } else {
-                response_unit["curvature"] = bus_info->curvature;
-                response_unit["route_length"] = bus_info->route_length;
-                response_unit["stop_count"] = static_cast<int>(bus_info->stops_count);
-                response_unit["unique_stop_count"] = static_cast<int>(bus_info->unique_stops_count);
+                response_unit.Key("curvature").Value(bus_info->curvature);
+                response_unit.Key("route_length").Value(bus_info->route_length);
+                response_unit.Key("stop_count").Value(static_cast<int>(bus_info->stops_count));
+                response_unit.Key("unique_stop_count").Value(static_cast<int>(bus_info->unique_stops_count));
             }
         } else if (type == "Stop") {
             const auto& name = request.at("name").AsString();
             const auto stop_info = handler.GetStopInfo(name);
             if (!stop_info) {
-                response_unit["error_message"] = "not found"s;
+                response_unit.Key("error_message").Value("not found"s);
             }
             else {
-                json::Array buses;
+                response_unit.Key("buses").StartArray();
                 for (const auto &bus: stop_info->buses) {
-                    buses.emplace_back(std::string(bus));
+                    response_unit.Value(std::string(bus));
                 }
-                response_unit["buses"] = std::move(buses);
+                response_unit.EndArray();
             }
         } else if (type == "Map") {
             std::ostringstream ss;
             handler.RenderMap().Render(ss);
-            response_unit["map"] = ss.str();
+            response_unit.Key("map").Value(ss.str());
         } else {
             continue;
         }
-        out_data.emplace_back(std::move(response_unit));
+        response_unit.EndDict();
+        out_builder.Value(std::move(response_unit.Build()));
     }
-    json::Print(json::Document(std::move(out_data)), output);
+    out_builder.EndArray();
+    json::Print(json::Document(std::move(out_builder.Build())), output);
 }
 
 }
