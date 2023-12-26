@@ -4,9 +4,9 @@
 namespace json {
 
 class Builder {
-    class AfterKeyValue{
+    class AfterStartDict{
     public:
-        AfterKeyValue(Builder& builder) : builder_(builder) {}
+        AfterStartDict(Builder& builder) : builder_(builder) {}
 
         auto Key(std::string key) {
             return builder_.Key(std::move(key));
@@ -23,7 +23,7 @@ class Builder {
     public:
         AfterKey(Builder& builder) : builder_(builder) {}
 
-        AfterKeyValue Value(Node::Value val) {
+        AfterStartDict Value(Node::Value val) {
             return builder_.Value(std::move(val));
         }
         auto StartDict() {
@@ -31,44 +31,6 @@ class Builder {
         }
         auto StartArray() {
             return builder_.StartArray();
-        }
-
-    private:
-        Builder& builder_;
-    };
-
-    class AfterStartDict{
-    public:
-        AfterStartDict(Builder& builder) : builder_(builder) {}
-
-        auto Key(std::string key) {
-            return builder_.Key(std::move(key));
-        }
-        auto& EndDict() {
-            return builder_.EndDict();
-        }
-
-    private:
-        Builder& builder_;
-    };
-
-    class AfterStartArrayValue{
-    public:
-        AfterStartArrayValue(Builder& builder) : builder_(builder) {}
-
-        AfterStartArrayValue Value(Node::Value val) {
-            return builder_.Value(std::move(val));
-        }
-
-        auto StartDict() {
-            return builder_.StartDict();
-        }
-        auto StartArray() {
-            return builder_.StartArray();
-        }
-
-        auto& EndArray() {
-            return builder_.EndArray();
         }
 
     private:
@@ -79,7 +41,7 @@ class Builder {
     public:
         AfterStartArray(Builder& builder) : builder_(builder) {}
 
-        AfterStartArrayValue Value(Node::Value val) {
+        AfterStartArray Value(Node::Value val) {
             return builder_.Value(std::move(val));
         }
 
