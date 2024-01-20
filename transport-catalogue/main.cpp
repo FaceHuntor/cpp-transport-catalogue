@@ -7,10 +7,11 @@ using namespace std;
 int main() {
     tc::catalogue::TransportCatalogue catalogue;
     tc::renderer::MapRenderer renderer;
+    tc::routing::TransportRouter router;
     tc::io::JsonReader reader;
-    tc::RequestHandler handler(catalogue, renderer);
+    tc::RequestHandler handler(catalogue, renderer, router);
 
     reader.ParseInput(cin);
-    reader.ApplyCommands(catalogue, renderer);
+    reader.ApplyCommands(catalogue, renderer, router);
     reader.GetOutput(handler, cout);
 }

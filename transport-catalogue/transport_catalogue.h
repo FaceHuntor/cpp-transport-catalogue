@@ -52,23 +52,7 @@ public:
 
     const Buses& GetBuses() const;
 
-private:
-    template<typename T>
-    void
-    static hash_combine(std::size_t &seed, T const &key) {
-        std::hash<T> hasher;
-        seed ^= hasher(key) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    }
-
-    template<typename T1, typename T2>
-    struct OrderedPairHasher {
-        std::size_t operator()(std::pair<T1, T2> const &p) const {
-            std::size_t seed1(0);
-            hash_combine(seed1, p.first);
-            hash_combine(seed1, p.second);
-            return seed1;
-        }
-    };
+    std::optional<double> GetDistance(std::string_view first_stop_name, std::string_view second_stop_name) const;
 
 private:
     Stops stops_;
@@ -76,7 +60,7 @@ private:
     std::unordered_map<std::string_view, domain::Bus *> buses_map_;
     std::unordered_map<std::string_view, domain::Stop *> stops_map_;
     std::unordered_map<std::pair<const domain::Stop*, const domain::Stop*>, double,
-                       OrderedPairHasher<const domain::Stop*, const domain::Stop*>> stops_distances_;
+                       domain::OrderedPairHasher<const domain::Stop*, const domain::Stop*>> stops_distances_;
 };
 
 }

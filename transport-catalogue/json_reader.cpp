@@ -1,10 +1,8 @@
 #include "json_reader.h"
 #include "json_builder.h"
 
-#include <algorithm>
-#include <cassert>
-#include <iterator>
 #include <sstream>
+#include <unordered_map>
 
 namespace tc::io {
 
@@ -33,14 +31,133 @@ svg::Color TransformColor(const json::Node& color_node) {
     return {};
 }
 
+class OutputFormer
+{
+public:
+    virtual void Form(json::Builder& response, const json::Dict& request, const RequestHandler& handler) const = 0;
+
+    virtual ~OutputFormer() = default;
+};
+
+
+class BusOutputFormer : public OutputFormer
+{
+public:
+    void Form(json::Builder& response, const json::Dict& request, const RequestHandler& handler) const override
+    {
+        const auto& name = request.at("name").AsString();
+        const auto bus_info = handler.GetBusInfo(name);
+        if (!bus_info) {
+            response.Key("error_message").Value("not found"s);
+        } else {
+            response.Key("curvature").Value(bus_info->curvature);
+            response.Key("route_length").Value(bus_info->route_length);
+            response.Key("stop_count").Value(static_cast<int>(bus_info->stops_count));
+            response.Key("unique_stop_count").Value(static_cast<int>(bus_info->unique_stops_count));
+        }
+    }
+
+    ~BusOutputFormer() override = default;
+};
+
+class StopOutputFormer : public OutputFormer
+{
+public:
+    void Form(json::Builder& response, const json::Dict& request, const RequestHandler& handler) const override
+    {
+        const auto& name = request.at("name").AsString();
+        const auto stop_info = handler.GetStopInfo(name);
+        if (!stop_info) {
+            response.Key("error_message").Value("not found"s);
+        }
+        else {
+            response.Key("buses").StartArray();
+            for (const auto &bus: stop_info->buses) {
+                response.Value(std::string(bus));
+            }
+            response.EndArray();
+        }
+    }
+
+    ~StopOutputFormer() override = default;
+};
+
+class RouteOutputFormer : public OutputFormer
+{
+private:
+    struct RouteItemVisitor {
+        json::Builder& response;
+
+        void operator()(const routing::TransportRouter::Route::BusItem& item) {
+            response.StartDict()
+                    .Key("type").Value("Bus"s)
+                    .Key("bus").Value(std::string(item.bus))
+                    .Key("time").Value(item.time)
+                    .Key("span_count").Value(item.span_count)
+                    .EndDict();
+        }
+        void operator()(const routing::TransportRouter::Route::WaitItem& item) {
+            response.StartDict()
+                    .Key("type").Value("Wait"s)
+                    .Key("time").Value(item.time)
+                    .Key("stop_name").Value(std::string(item.stop_name.data()))
+                    .EndDict();
+        }
+    };
+
+public:
+    void Form(json::Builder& response, const json::Dict& request, const RequestHandler& handler) const override
+    {
+        const auto& from = request.at("from").AsString();
+        const auto& to = request.at("to").AsString();
+        auto route = handler.GetRoute(from, to);
+        if(!route) {
+            response.Key("error_message").Value("not found"s);
+        } else {
+            response.Key("total_time").Value(route->total_time);
+            auto items = response.Key("items").StartArray();
+            for(const auto& item: route->items) {
+                std::visit(RouteItemVisitor{response}, item);
+            }
+            items.EndArray();
+        }
+    }
+
+    ~RouteOutputFormer() override = default;
+
+
+};
+
+class MapOutputFormer : public OutputFormer
+{
+public:
+    void Form(json::Builder& response, [[maybe_unused]] const json::Dict& request, const RequestHandler& handler) const override
+    {
+        std::ostringstream ss;
+        handler.RenderMap().Render(ss);
+        response.Key("map").Value(ss.str());
+    }
+
+    ~MapOutputFormer() override = default;
+};
+
+
 void JsonReader::ParseInput(std::istream& input) {
     requests_ = json::Load(input);
 }
 
-void JsonReader::ApplyCommands(catalogue::TransportCatalogue& db, renderer::MapRenderer& renderer) const {
+void JsonReader::ApplyCommands(catalogue::TransportCatalogue& db,
+                               renderer::MapRenderer& renderer,
+                               routing::TransportRouter& router) const {
     auto& requests_map = requests_.GetRoot().AsMap();
     FillCatalogue(db, requests_map.at("base_requests").AsArray());
     SettingRenderer(renderer, requests_map.at("render_settings").AsMap());
+    SettingRouter(router, requests_map.at("routing_settings").AsMap());
+    router.SetData(db.GetBuses().begin(), db.GetBuses().end(),
+                   db.GetStops().begin(), db.GetStops().end(),
+                   [&db](std::string_view stop1, std::string_view stop2) {
+                       return db.GetDistance(stop1, stop2);
+    });
 }
 
 void JsonReader::GetOutput(const tc::RequestHandler& handler, std::ostream& output) const {
@@ -143,7 +260,31 @@ void JsonReader::SettingRenderer(renderer::MapRenderer& rend, const json::Dict& 
     rend.SetSettings(settings);
 }
 
+void JsonReader::SettingRouter(routing::TransportRouter& router, const json::Dict& requests) {
+    routing::TransportRouter::RouterSettings settings{};
+
+    if (requests.count("bus_wait_time")) {
+        settings.bus_wait_time = requests.at("bus_wait_time").AsInt();
+    }
+    if (requests.count("bus_velocity")) {
+        settings.bus_velocity = requests.at("bus_velocity").AsDouble() * 1000.0 / 60.0;
+    }
+
+    router.SetSettings(std::move(settings));
+}
+
 void JsonReader::FormOutput(const RequestHandler& handler, const json::Array& requests, std::ostream& output) {
+    static const BusOutputFormer busOutputFormer;
+    static const StopOutputFormer stopOutputFormer;
+    static const RouteOutputFormer routeOutputFormer;
+    static const MapOutputFormer mapOutputFormer;
+    static const std::unordered_map<std::string_view, const OutputFormer&> outputFormers = {
+            {"Bus"sv, busOutputFormer},
+            {"Stop"sv, stopOutputFormer},
+            {"Route"sv, routeOutputFormer},
+            {"Map"sv, mapOutputFormer}
+    };
+
     json::Builder out_builder;
     out_builder.StartArray();
 
@@ -154,42 +295,16 @@ void JsonReader::FormOutput(const RequestHandler& handler, const json::Array& re
         response_unit.StartDict();
         response_unit.Key("request_id").Value(request.at("id").AsInt());
 
-        if (type == "Bus") {
-            const auto& name = request.at("name").AsString();
-            const auto bus_info = handler.GetBusInfo(name);
-            if (!bus_info) {
-                response_unit.Key("error_message").Value("not found"s);
-            } else {
-                response_unit.Key("curvature").Value(bus_info->curvature);
-                response_unit.Key("route_length").Value(bus_info->route_length);
-                response_unit.Key("stop_count").Value(static_cast<int>(bus_info->stops_count));
-                response_unit.Key("unique_stop_count").Value(static_cast<int>(bus_info->unique_stops_count));
-            }
-        } else if (type == "Stop") {
-            const auto& name = request.at("name").AsString();
-            const auto stop_info = handler.GetStopInfo(name);
-            if (!stop_info) {
-                response_unit.Key("error_message").Value("not found"s);
-            }
-            else {
-                response_unit.Key("buses").StartArray();
-                for (const auto &bus: stop_info->buses) {
-                    response_unit.Value(std::string(bus));
-                }
-                response_unit.EndArray();
-            }
-        } else if (type == "Map") {
-            std::ostringstream ss;
-            handler.RenderMap().Render(ss);
-            response_unit.Key("map").Value(ss.str());
-        } else {
+        if(!outputFormers.count(type)) {
             continue;
         }
+        outputFormers.at(type).Form(response_unit, request, handler);
+
         response_unit.EndDict();
         out_builder.Value(std::move(response_unit.Build()));
     }
     out_builder.EndArray();
-    json::Print(json::Document(std::move(out_builder.Build())), output);
+    json::Print(json::Document(out_builder.Build()), output);
 }
 
 }

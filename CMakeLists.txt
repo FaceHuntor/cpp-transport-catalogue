@@ -10,3 +10,4 @@ file(GLOB ${PROJECT_NAME}_SOURCES
         ${${PROJECT_NAME}_SOURCES_DIR}/*.h)
 
 add_executable(${PROJECT_NAME} ${${PROJECT_NAME}_SOURCES})
+target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Werror -Wextra -Wpedantic)

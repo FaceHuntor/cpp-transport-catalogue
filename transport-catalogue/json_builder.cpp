@@ -11,7 +11,7 @@ Builder::AfterStartDict Builder::StartDict() {
     if(nodes_stack_.empty() || !nodes_stack_.back()->IsNull()) {
         throw std::logic_error("Incorrect place for StartDict");
     }
-    nodes_stack_.back()->GetValue() = std::move(Dict());
+    nodes_stack_.back()->GetValue() = Dict();
     return *this;
 }
 
@@ -45,7 +45,7 @@ Builder::AfterStartArray Builder::StartArray() {
     if(nodes_stack_.empty() || !nodes_stack_.back()->IsNull()) {
         throw std::logic_error("Incorrect place for StartArray");
     }
-    nodes_stack_.back()->GetValue() = std::move(Array());
+    nodes_stack_.back()->GetValue() = Array();
     auto& back_array = std::get<Array>(nodes_stack_.back()->GetValue()).emplace_back();
     nodes_stack_.emplace_back(&back_array);
     return *this;

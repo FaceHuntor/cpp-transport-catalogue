@@ -104,4 +104,19 @@ const TransportCatalogue::Buses& TransportCatalogue::GetBuses() const {
     return buses_;
 }
 
+std::optional<double> TransportCatalogue::GetDistance(std::string_view first_stop_name, std::string_view second_stop_name) const {
+    if(!stops_map_.count(first_stop_name) || !stops_map_.count(second_stop_name)){
+        return std::nullopt;
+    }
+    const auto* first_stop = stops_map_.at(first_stop_name);
+    const auto* second_stop = stops_map_.at(second_stop_name);
+    if(!stops_distances_.count({first_stop, second_stop})) {
+        if(!stops_distances_.count({second_stop, first_stop})) {
+            return std::nullopt;
+        }
+        return stops_distances_.at({second_stop, first_stop});
+    }
+    return stops_distances_.at({first_stop, second_stop});
+}
+
 }
